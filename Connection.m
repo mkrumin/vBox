@@ -1,8 +1,7 @@
 classdef Connection < handle
     
     properties
-        LocalPort
-        Tag
+        Name
         udpObj
         ExpRef
         cameraObj
@@ -13,36 +12,37 @@ classdef Connection < handle
     end
     
     methods
-        function obj = Connection(tag)
+        function obj = Connection(name)
             camList = camConfigList;
-            if nargin > 0 && ~isempty(tag)
-                camIndex = find(ismember({camList.Tag}, tag));
+            if nargin > 0 && ~isempty(name)
+                camIndex = find(ismember({camList.Name}, name));
                 if isempty(camIndex)
-                    fprintf('Camera ''%s'' is not in the list of available cameras\n', tag)
+                    fprintf('Camera ''%s'' is not in the list of available cameras\n', name)
                     fprintf('Available cameras are: \n');
                     for iCam = 1:length(camList)
-                        fprintf('''%s''\n', camList(iCam).Tag);
+                        fprintf('''%s''\n', camList(iCam).Name);
                     end
-                    fprintf('Will initialize camera ''%s'' (Serial Number %s)\n', ...
-                        camList(1).Tag, camList(1).DeviceSerialNumber)
+                    fprintf('Will initialize camera ''%s'' (SN: %s)\n', ...
+                        camList(1).Name, camList(1).DeviceSerialNumber)
                     camIndex = 1;
                 end
             else
-                fprintf('No camera name provided, will initialize camera ''%s'' (Serial Number %s)\n', ...
-                    camList(1).Tag, camList(1).DeviceSerialNumber)
+                fprintf('No camera name provided, will initialize camera ''%s'' (SN: %s)\n', ...
+                    camList(1).Name, camList(1).DeviceSerialNumber)
                 camIndex = 1;
             end
             camParams = camList(camIndex);
             fprintf('Setting up UDP communication..\n')
             [LocalIP, LocalHost] = myIP;
             
+            obj.udpObj = udp('0.0.0.0', 1);
             if isfield(camParams, 'LocalPort')
-                obj.udpObj = udp('0.0.0.0', 1, 'LocalPort', camParams.LocalPort);
+                obj.udpObj.LocalPort = camParams.LocalPort;
             else
-                obj.udpObj = udp('0.0.0.0', 1, 'LocalPort', obj.defaultLocalPort);
+                obj.udpObj.LocalPort =  obj.defaultLocalPort;
             end
-            fprintf('Camera ''%s'' will listen on IP %s (aka ''%s''), port %d\n', ...
-                camParams.Tag, LocalIP, LocalHost, obj.udpObj.LocalPort);
+            fprintf('Camera ''%s'' (SN: %s) will listen on IP %s (aka ''%s''), port %d\n', ...
+                camParams.Name, camParams.DeviceSerialNumber, LocalIP, LocalHost, obj.udpObj.LocalPort);
             obj.udpObj.DatagramReceivedFcn = @obj.udpCallback;
             fopen(obj.udpObj);
         end
@@ -50,7 +50,7 @@ classdef Connection < handle
         function udpCallback(obj, src, eventData)
             
             timestamp = clock;
-            timeStampStr = sprintf('[%s %s]', obj.Tag, datestr(timestamp, 'HH:MM:SS.FFF'));
+            timeStampStr = sprintf('[%s %s]', obj.Name, datestr(timestamp, 'HH:MM:SS.FFF'));
             
             RemoteIP=obj.udpObj.DatagramAddress;
             RemotePort=obj.udpObj.DatagramPort;
@@ -88,6 +88,7 @@ classdef Connection < handle
         end
         
         function delete(obj)
+            fprintf('Destructor of Connection class called, will release the UDP port\n');
             fclose(obj.udpObj);
             delete(obj.udpObj);
         end
