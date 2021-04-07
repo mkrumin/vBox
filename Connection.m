@@ -2,6 +2,7 @@ classdef Connection < handle
     
     properties
         Name
+        SerialNumber
         udpObj
         ExpRef
         cameraObj
@@ -32,6 +33,9 @@ classdef Connection < handle
                 camIndex = 1;
             end
             camParams = camList(camIndex);
+            obj.Name = camParams.Name;
+            obj.SerialNumber = camParams.DeviceSerialNumber;
+            
             fprintf('Setting up UDP communication..\n')
             [LocalIP, LocalHost] = myIP;
             
@@ -41,10 +45,17 @@ classdef Connection < handle
             else
                 obj.udpObj.LocalPort =  obj.defaultLocalPort;
             end
-            fprintf('Camera ''%s'' (SN: %s) will listen on IP %s (aka ''%s''), port %d\n', ...
+            fprintf('Camera ''%s'' (SN: %s) will be listening on IP %s (aka ''%s''), port %d\n', ...
                 camParams.Name, camParams.DeviceSerialNumber, LocalIP, LocalHost, obj.udpObj.LocalPort);
             obj.udpObj.DatagramReceivedFcn = @obj.udpCallback;
             fopen(obj.udpObj);
+            
+            fprintf('Setting up ''%s'' camera...\n', obj.Name)
+            obj.cameraObj = Camera(obj.SerialNumber);
+            fps = obj.cameraObj.setFrameRate(camParams.FrameRate);
+            fprintf('''%s'' camera is now running at %5.3f fps\n', obj.Name, fps);
+            
+            startPreview(obj.cameraObj);
         end
         
         function udpCallback(obj, src, eventData)
@@ -89,8 +100,10 @@ classdef Connection < handle
         
         function delete(obj)
             fprintf('Destructor of Connection class called, will release the UDP port\n');
-            fclose(obj.udpObj);
-            delete(obj.udpObj);
+            if ~isempty(obj.udpObj)
+                fclose(obj.udpObj);
+                delete(obj.udpObj);
+            end
         end
     end
 end
