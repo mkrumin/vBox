@@ -53,6 +53,7 @@ classdef Connection < handle
             
             fprintf('Setting up ''%s'' camera...\n', obj.Name)
             obj.cameraObj = Camera(obj.SerialNumber);
+            obj.cameraObj.vid.Tag = obj.Name;
             fps = obj.cameraObj.setFrameRate(camParams.FrameRate);
             fprintf('''%s'' camera is now running at %5.3f fps\n', obj.Name, fps);
             
@@ -104,10 +105,16 @@ classdef Connection < handle
                         fprintf('Opened %s for logging UDPs\n', fileName);
                     end
                     obj.logUDP(timestamp, char(receivedData'));
+                    
+                    % start camera acquisition
+                    obj.cameraObj.startAcquisition(fullfile(localDataFolder, fileBase));
+                    
                     fwrite(obj.udpObj, receivedData); % echo after completing required actions
                 case {'ExpEnd', 'ExpInterrupt'}
                     fclose(obj.udpLogFile);
                     obj.udpLogFile = [];
+                    % stop camera acquisition
+                    obj.cameraObj.stopAcquisition();
                     obj.ExpRef = '';
                     fwrite(obj.udpObj, receivedData); % echo after completing required actions
                 case 'alyx' % recieved Alyx instance
@@ -140,6 +147,10 @@ classdef Connection < handle
             if ~isempty(obj.udpObj)
                 fclose(obj.udpObj);
                 delete(obj.udpObj);
+            end
+            if ~isempty(obj.udpLogFile)
+                fclose(obj.udpLogFile);
+                obj.udpLogFile = [];
             end
         end
     end

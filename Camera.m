@@ -50,8 +50,12 @@ classdef Camera < handle
             obj.src.GainAuto = 'Off';
             obj.src.Gain = 0;
             warning('on', 'spinnaker:propertySet');
-            fprintf('%s camera had been initialized, running at %5.3f fps\n', ...
-                obj.src.DeviceModelName, obj.src.AcquisitionFrameRate); 
+            
+            obj.vid.FramesPerTrigger = Inf;
+            obj.vid.TriggerRepeat = 0;
+            
+            fprintf('%s (DeviceID %d) camera had been initialized\n', ...
+                obj.src.DeviceModelName, obj.vid.DeviceID); 
             
         end
         
@@ -81,11 +85,62 @@ classdef Camera < handle
             closepreview(obj.vid)
         end
         
-        function startAcquisition(obj, fileName)
+        function startAcquisition(obj, fileBase)
+            % define acquisition parameters
+            vw = VideoWriter(fileBase, 'Motion JPEG 2000');
+            vw.FrameRate = obj.src.AcquisitionFrameRate;
+            vw.LosslessCompression = false;
+            vw.CompressionRatio = 10;
+            vw.MJ2BitDepth = 8;
+            obj.vid.DiskLogger = vw;
+            obj.vid.LoggingMode = 'disk';
+            obj.vid.FramesAcquiredFcnCount = 1000;
+            obj.vid.FramesAcquiredFcn = @obj.grabFrames;
+%             % actually start acquisition
+%             fprintf('Stopping preview for fast fps\n');
+%             obj.stopPreview;
+            start(obj.vid);
+            % make sure it is running?
             
         end
         
         function stopAcquisition(obj)
+            % stop acquisition
+            stop(obj.vid);
+            % confirm if stopped
+            fprintf('[%s] Waiting for logging to finish...', obj.vid.Tag);
+            waitStr = '-\|/';
+            i = 1;
+            tic;
+            nChar = 1;
+            while (obj.vid.FramesAcquired ~= obj.vid.DiskLoggerFrameCount)
+                fprintf(repmat('\b', 1, nChar));
+                nChar = fprintf('(%g)', obj.vid.FramesAcquired - obj.vid.DiskLoggerFrameCount);
+%                 fprintf('\b%s', waitStr(mod(i, 4)+1));
+                pause(.1)
+                
+                i = i+1;
+                if (obj.vid.FramesAcquired - obj.vid.DiskLoggerFrameCount <= 1)
+                    pause(0.1)
+                    break;
+                end
+            end
+            fprintf(repmat('\b', 1, nChar));
+            fprintf('.done (%g seconds)\n', toc);
+            fprintf('[%s] Acquired %g frame, logged %g frames\n', ...
+                obj.vid.Tag, obj.vid.FramesAcquired, obj.vid.DiskLoggerFrameCount)
+
+            % clean up
+            delete(obj.vid.DiskLogger);
+            obj.vid.DiskLogger = [];
+%             fprintf('Resuming preview\n');
+%             obj.startPreview(obj.hPreview);
+        end
+        
+        function grabFrames(obj, src, eventData)
+            % this function will run every FramesAcquiredFcnCount frames
+            fprintf('[%s] FramesAcquired = %g, FramesLogged = %g\n', ...
+                obj.vid.Tag, obj.vid.FramesAcquired, obj.vid.DiskLoggerFrameCount);
         end
         
         function delete(obj)
