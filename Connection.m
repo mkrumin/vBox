@@ -4,7 +4,8 @@ classdef Connection < handle
         Name
         SerialNumber
         udpObj
-        ExpRef
+        udpLogFile = [];
+        ExpRef = '';
         cameraObj
     end
     
@@ -70,6 +71,7 @@ classdef Connection < handle
             obj.udpObj.RemotePort=RemotePort;
             receivedData=fread(obj.udpObj);
             str=char(receivedData');
+            obj.logUDP(timestamp, str);
             fprintf('%s Received ''%s'' from %s:%d\n', timeStampStr, str, RemoteIP, RemotePort);
             %             fwrite(obj.udpObj, receivedData);
             
@@ -79,8 +81,34 @@ classdef Connection < handle
                 case 'hello'
                     fwrite(obj.udpObj, receivedData);
                 case 'ExpStart'
+                    obj.ExpRef = info.expRef;
+                    localDataFolder = dat.expPath(obj.ExpRef, 'local', 'master');
+                    fileBase = sprintf('%s_%s', obj.ExpRef, obj.Name);
+                    if ~exist(localDataFolder, 'dir')
+                        [success, errMsg] = mkdir(localDataFolder);
+                        if success
+                            fprintf('Folder %s successfully created\n', localDataFolder)
+                        else
+                            warning('There was a problem creating folder %s\n', localDataFolder)
+                            warning('System message: %s\n', errMsg);
+                            return; % this will crash the master host on timeout, 
+                            % but will not disable DatagramReceivedFun of the udp
+                        end
+                    end
+                    fileName = fullfile(localDataFolder, [fileBase, '_UDPLog.txt']);
+                    [obj.udpLogFile, errMsg] = fopen(fileName, 'at');
+                    if (obj.udpLogFile == -1)
+                        fprintf('Failed to open %s, exiting...\n', fileName);
+                        return;
+                    else
+                        fprintf('Opened %s for logging UDPs\n', fileName);
+                    end
+                    obj.logUDP(timestamp, char(receivedData'));
                     fwrite(obj.udpObj, receivedData); % echo after completing required actions
                 case {'ExpEnd', 'ExpInterrupt'}
+                    fclose(obj.udpLogFile);
+                    obj.udpLogFile = [];
+                    obj.ExpRef = '';
                     fwrite(obj.udpObj, receivedData); % echo after completing required actions
                 case 'alyx' % recieved Alyx instance
                     fwrite(obj.udpObj, receivedData);
@@ -96,6 +124,15 @@ classdef Connection < handle
                     fprintf('Unknown instruction : %s', info.instruction);
                     fwrite(obj.udpObj, receivedData);
             end
+        end
+        
+        function logUDP(obj, tStamp, msg)
+            if ~isempty(obj.udpLogFile)
+                fprintf(obj.udpLogFile, '[%s] ''%s'' from %s:%d\r\n', ...
+                    datestr(tStamp, 'YYYY-mm-dd HH:MM:SS.FFF'), ...
+                    msg, obj.udpObj.RemoteHost, obj.udpObj.RemotePort);
+            end
+            
         end
         
         function delete(obj)

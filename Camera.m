@@ -81,7 +81,8 @@ classdef Camera < handle
             closepreview(obj.vid)
         end
         
-        function startAcquisition(obj)
+        function startAcquisition(obj, fileName)
+            
         end
         
         function stopAcquisition(obj)
