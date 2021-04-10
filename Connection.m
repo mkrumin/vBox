@@ -114,7 +114,10 @@ classdef Connection < handle
                     fclose(obj.udpLogFile);
                     obj.udpLogFile = [];
                     % stop camera acquisition
-                    obj.cameraObj.stopAcquisition();
+                    try
+                        obj.cameraObj.stopAcquisition();
+                    catch
+                    end
                     obj.ExpRef = '';
                     fwrite(obj.udpObj, receivedData); % echo after completing required actions
                 case 'alyx' % recieved Alyx instance
@@ -140,6 +143,11 @@ classdef Connection < handle
                     msg, obj.udpObj.RemoteHost, obj.udpObj.RemotePort);
             end
             
+        end
+        
+        function resetUDP(obj)
+            fclose(obj.udpObj);
+            fopen(obj.udpObj);
         end
         
         function delete(obj)
