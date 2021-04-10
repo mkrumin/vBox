@@ -99,7 +99,8 @@ classdef Connection < handle
                     fileName = fullfile(localDataFolder, [fileBase, '_UDPLog.txt']);
                     [obj.udpLogFile, errMsg] = fopen(fileName, 'at');
                     if (obj.udpLogFile == -1)
-                        fprintf('Failed to open %s, exiting...\n', fileName);
+                        warning('Failed to open %s, exiting...\n', fileName);
+                        warning('System message: %s\n', errMsg)
                         return;
                     else
                         fprintf('Opened %s for logging UDPs\n', fileName);
@@ -107,17 +108,16 @@ classdef Connection < handle
                     obj.logUDP(timestamp, char(receivedData'));
                     
                     % start camera acquisition
-                    obj.cameraObj.startAcquisition(fullfile(localDataFolder, fileBase));
+                    success = obj.cameraObj.startAcquisition(fullfile(localDataFolder, fileBase));
                     
-                    fwrite(obj.udpObj, receivedData); % echo after completing required actions
+                    if success
+                        fwrite(obj.udpObj, receivedData); % echo after completing required actions
+                    end % otherwise mc/mpep will TimeOut
                 case {'ExpEnd', 'ExpInterrupt'}
                     fclose(obj.udpLogFile);
                     obj.udpLogFile = [];
                     % stop camera acquisition
-                    try
-                        obj.cameraObj.stopAcquisition();
-                    catch
-                    end
+                    obj.cameraObj.stopAcquisition();
                     obj.ExpRef = '';
                     fwrite(obj.udpObj, receivedData); % echo after completing required actions
                 case 'alyx' % recieved Alyx instance
@@ -160,6 +160,7 @@ classdef Connection < handle
                 fclose(obj.udpLogFile);
                 obj.udpLogFile = [];
             end
+            delete(obj.cameraObj)
         end
     end
 end

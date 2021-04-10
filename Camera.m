@@ -88,8 +88,9 @@ classdef Camera < handle
             closepreview(obj.vid)
         end
         
-        function startAcquisition(obj, fileBase)
+        function allGood = startAcquisition(obj, fileBase)
             % define acquisition parameters
+            allGood = false;
             CR = 5; % compression ratio
             vw = VideoWriter(fileBase, 'Motion JPEG 2000');
             vw.FrameRate = obj.src.AcquisitionFrameRate;
@@ -104,53 +105,48 @@ classdef Camera < handle
             obj.VW = vw2;
             obj.vid.LoggingMode = 'memory';
             obj.vid.DiskLogger = vw;
-            %             obj.VW = vw;
             obj.vid.FramesAcquiredFcnCount = 100;
             obj.vid.FramesAcquiredFcn = @obj.grabFrames;
             obj.vid.StopFcn = @obj.grabFrames;
             obj.vid.TimerFcn = @obj.printStats;
             obj.vid.TimerPeriod = 10;
-            %             % actually start acquisition
             
-            obj.hMeta = fopen([fileBase, '_meta.bin'], 'w');
-            obj.hTimes = fopen([fileBase, '_times.txt'], 'at');
+            [obj.hMeta, errorMsg] = fopen([fileBase, '_meta.bin'], 'w+');
+            if (obj.hMeta == -1)
+                warning('Failed to open %s file for writing embedded metadata\n', ...
+                    [fileBase, '_meta.bin']);
+                warning('System message: %s\n', errorMsg);
+                warning('Will not start acquisition (will cause TimeOut)')
+                return;
+            end
+            obj.hTimes = fopen([fileBase, '_times.txt'], 'at+');
+            if (obj.hTimes == -1)
+                warning('Failed to open %s file for logging timing metadata\n', ...
+                    [fileBase, '_times.txt']);
+                warning('System message: %s\n', errorMsg);
+                warning('Will not start acquisition (will cause TimeOut)');
+                return;
+            end
             fprintf(obj.hTimes, ...
                 'AbsTime\t\t\t\tFrameNumber\tRelativeFrame\tTriggerIndex\tTime\r\n');
-            if obj.src.AcquisitionFrameRate > 151
-                fprintf('Stopping preview for fast fps\n');
-                obj.stopPreview;
-            end
-            %             open(obj.VW);
+
+            % actually start acquisition
             open(obj.vid.DiskLogger);
             warning off
             start(obj.vid);
             warning on
-            % make sure it is running?
-            
+            % TODO Make sure it is running? How?
+            allGood = true;
         end
         
         function stopAcquisition(obj)
             % stop acquisition
             stop(obj.vid);
-            % confirm if stopped
-            %             waitStr = '-\|/';
-            %             i = 1;
-            tic;
-            nChar = 1;
-            %             while (obj.vid.FramesAcquired ~= obj.vid.DiskLoggerFrameCount)
-            %                 fprintf(repmat('\b', 1, nChar));
-            %                 nChar = fprintf('(%g)', obj.vid.FramesAcquired - obj.vid.DiskLoggerFrameCount);
-            % %                 fprintf('\b%s', waitStr(mod(i, 4)+1));
-            %                 pause(.1)
-            %
-            %                 i = i+1;
-            %                 if (obj.vid.FramesAcquired - obj.vid.DiskLoggerFrameCount <= 1)
-            %                     pause(0.1)
-            %                     break;
-            %                 end
-            %             end
             
             if (obj.vid.FramesAvailable > 0)
+                % should never get here
+                tic;
+                nChar = 1;
                 fprintf('[%s] Waiting for logging to finish...', obj.vid.Tag);
                 
                 while (obj.vid.FramesAvailable > 0)
@@ -161,43 +157,33 @@ classdef Camera < handle
                 fprintf(repmat('\b', 1, nChar));
                 fprintf('.done (%g seconds)\n', toc);
             end
+            
             fprintf('[%s] Acquired %g frames, logged %g + %g frames\n', ...
                 obj.vid.Tag, obj.vid.FramesAcquired, ...
                 get(obj.vid.DiskLogger, 'FrameCount'), get(obj.VW, 'FrameCount'))
             
+            % postprocessing of metadata
+            % this will save the  *_frameTime.mat file
+            obj.processMetadata;
+            
             % clean up
-            %             pause(1);
-            %             close(obj.VW);
-            %             obj.VW = [];
             fclose(obj.hTimes);
             fclose(obj.hMeta);
             delete(obj.vid.DiskLogger);
             obj.vid.DiskLogger = [];
-            if obj.src.AcquisitionFrameRate > 151
-                fprintf('Resuming preview\n');
-                obj.startPreview(obj.hPreview);
-            end
+            delete(obj.VW);
+            obj.VW = [];
         end
         
         function grabFrames(obj, src, eventData)
             % this function will run every FramesAcquiredFcnCount frames
-%             fprintf('[%s] FramesAcquired = %g, FramesLogged = %g\n', ...
-%                 src.Tag, src.FramesAcquired, get(src.DiskLogger, 'FrameCount'));
-            tic
             nFrames = src.FramesAvailable;
             [data, t, meta] = getdata(src, nFrames);
-%             fprintf('Pulled %d frames from memory in %5.3f seconds\n', nFrames, toc);
-            tic;
-            %             writeVideo(obj.VW, data);
             if isequal(src.Logging, 'on')
                 writeVideo(src.DiskLogger, data);
-%                 fprintf('Logged %d frames to disk in %5.3f seconds\n', nFrames, toc);
             else
-%                 fprintf('Logging to the main file was off\n');
                 open(obj.VW);
                 writeVideo(obj.VW, data)
-%                 fprintf('Logged %d frames to file %s in %5.3f seconds\n', ...
-%                     nFrames, get(obj.VW, 'FileName'), toc);
                 close(obj.VW);
             end
             % Writing metadata embedded in the frame (camera times - precise)
@@ -211,12 +197,69 @@ classdef Camera < handle
                 fprintf(obj.hTimes, '[%d,%d,%d,%d,%d,%.5f]\t%d\t\t%d\t\t%d\t\t%.5f\r\n', ...
                     s.AbsTime, s.FrameNumber, s.RelativeFrame, s.TriggerIndex, t(iFrame));
             end
-
+            
         end
         
         function printStats(obj, src, eventData)
             fprintf('\n[%s] FramesAcquired = %g, FramesLogged = %g, FramesAvailable = %g\n\n', ...
                 src.Tag, src.FramesAcquired, get(src.DiskLogger, 'FrameCount'), src.FramesAvailable);
+        end
+        
+        function processMetadata(obj)
+            % extract and process metadata embedded in the frames
+            frewind(obj.hMeta);
+            embeddedData = fread(obj.hMeta, '*uint8');
+            embeddedData = reshape(embeddedData, 8, [])';
+            frameCounter = embeddedData(:, 5:8);
+            frameCounter = bsxfun(@times, int64(frameCounter), int64(256.^[3 2 1 0]));
+            frameCounter = sum(frameCounter, 2);
+            dFrames = diff(frameCounter);
+            dFrames(dFrames<0) = dFrames(dFrames<0) + 2^32;
+            frameCounter = [1; cumsum(dFrames)+1];
+            timeData = int16(embeddedData(:, 1:4));
+            seconds = int8(floor(timeData(:,1))/2);
+            cycles = mod(timeData(:, 1), 2) * 2^12 + timeData(:, 2) * 2^4 + floor(timeData(:,3)/2^4);
+            
+            dSeconds = int16(diff(seconds));
+            dSeconds(dSeconds<0) = dSeconds(dSeconds<0) + 128;
+            
+            dCycles = diff(cycles);
+            dCycles(dCycles<0) = dCycles(dCycles<0) + 8000;
+            dCycles(dSeconds==1) = dCycles(dSeconds==1) - 8000;
+            
+            timeStamp = [0; double(cumsum(dSeconds)) + double(cumsum(dCycles))/8000];
+            
+            embeddedData  = struct('frameCounter', frameCounter, 'timeStamp', timeStamp);
+            
+            % extract the software timing information
+            % expected number of Frames
+            nFrames = length(embeddedData.frameCounter);
+            absTime = nan(nFrames, 1);
+            frameNumber = nan(nFrames, 1);
+            frameTime = nan(nFrames, 1);
+            frewind(obj.hTimes);
+            textLine = fgetl(obj.hTimes); % this is title line
+            iFrame = 0;
+            while ~feof(obj.hTimes)
+                textLine = fgetl(obj.hTimes);
+                if ~isempty(textLine) && ~isequal(textLine, -1)
+                    iFrame = iFrame +1;
+                    tmp = str2num(textLine);
+                    absTime(iFrame) = datenum(tmp(1:6));
+                    frameNumber(iFrame) = tmp(7);
+                    frameTime(iFrame) = tmp(10);
+                end
+            end
+            
+            softData = struct('absTime', absTime, ...
+                'frameNumber', frameNumber, ...
+                'frameTime', frameTime);
+            
+            % A hacky way to figure out what is the filename
+            [~, fn, ~] = fileparts(get(obj.vid.DiskLogger, 'FileName'));
+            fp = get(obj.vid.DiskLogger, 'Path');
+            
+            save(fullfile(fp, [fn, '_frameTimes']), 'embeddedData', 'softData');
             
         end
         
