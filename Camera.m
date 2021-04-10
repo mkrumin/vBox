@@ -5,6 +5,8 @@ classdef Camera < handle
         src
         hPreview
         VW
+        hMeta
+        hTimes
     end
     
     properties(Access = private)
@@ -109,6 +111,11 @@ classdef Camera < handle
             obj.vid.TimerFcn = @obj.printStats;
             obj.vid.TimerPeriod = 10;
             %             % actually start acquisition
+            
+            obj.hMeta = fopen([fileBase, '_meta.bin'], 'w');
+            obj.hTimes = fopen([fileBase, '_times.txt'], 'at');
+            fprintf(obj.hTimes, ...
+                'AbsTime\t\t\t\tFrameNumber\tRelativeFrame\tTriggerIndex\tTime\r\n');
             if obj.src.AcquisitionFrameRate > 151
                 fprintf('Stopping preview for fast fps\n');
                 obj.stopPreview;
@@ -162,6 +169,8 @@ classdef Camera < handle
             %             pause(1);
             %             close(obj.VW);
             %             obj.VW = [];
+            fclose(obj.hTimes);
+            fclose(obj.hMeta);
             delete(obj.vid.DiskLogger);
             obj.vid.DiskLogger = [];
             if obj.src.AcquisitionFrameRate > 151
@@ -191,6 +200,18 @@ classdef Camera < handle
 %                     nFrames, get(obj.VW, 'FileName'), toc);
                 close(obj.VW);
             end
+            % Writing metadata embedded in the frame (camera times - precise)
+            % First 4 bytes is timestamp, next 4 bytes - frameCounter
+            embeddedData = squeeze(data(1, 1:8, 1, :));
+            fwrite(obj.hMeta, embeddedData, 'uint8');
+            % Logging the timing metadata, as received from getdata();
+            % This is in computer time - less precise
+            for iFrame = 1:nFrames
+                s = meta(iFrame);
+                fprintf(obj.hTimes, '[%d,%d,%d,%d,%d,%.5f]\t%d\t\t%d\t\t%d\t\t%.5f\r\n', ...
+                    s.AbsTime, s.FrameNumber, s.RelativeFrame, s.TriggerIndex, t(iFrame));
+            end
+
         end
         
         function printStats(obj, src, eventData)
