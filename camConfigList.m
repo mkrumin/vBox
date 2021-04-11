@@ -31,7 +31,7 @@ list = struct;
 i = 1;
 list(i).Name = 'bellyCam'; 
 list(i).DeviceSerialNumber = '19462577';
-list(i).FrameRate = 150;
+list(i).FrameRate = 60;
 list(i).LocalPort = 1001;
 list(i).CompressionRatio = 5;
 

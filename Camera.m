@@ -65,7 +65,19 @@ classdef Camera < handle
         
         function fps = setFrameRate(obj, frameRate)
             warning('off', 'spinnaker:propertySet');
+            frInfo = propinfo(obj.src, 'AcquisitionFrameRate');
+            frLimits = frInfo.ConstraintValue;
+            if frameRate > frLimits(2)
+                fprintf('Desired frame rate of %g fps is too high, setting it to %g fps\n', ...
+                    frameRate, frLimits(2));
+                obj.src.AcquisitionFrameRate = frLimits(2);
+            elseif frameRate < frLimits(1)
+                fprintf('Desired frame rate of %g fps is too low, setting it to %g fps\n', ...
+                    frameRate, frLimits(1));
+                obj.src.AcquisitionFrameRate = frLimits(1);
+            else
             obj.src.AcquisitionFrameRate = frameRate;
+            end
             exposureInfo = propinfo(obj.src, 'ExposureTime');
             % setting max possible exposure for the current frameRate
             obj.src.ExposureTime = exposureInfo.ConstraintValue(2);
