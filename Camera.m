@@ -172,9 +172,12 @@ classdef Camera < handle
 
             % actually start acquisition
             open(obj.vid.DiskLogger);
+            fprintf('Starting acquisition...\n');
+            fprintf('The following warning about DiskLogger ... ''memory'' ... ''disk'' ... ''disk&memory'' is OK\n');
             warning off
             start(obj.vid);
             warning on
+            
             % TODO Make sure it is running? How?
             allGood = true;
         end
@@ -241,7 +244,7 @@ classdef Camera < handle
         end
         
         function printStats(obj, src, eventData)
-            fprintf('\n[%s] FramesAcquired = %g, FramesLogged = %g, FramesAvailable = %g\n\n', ...
+            fprintf('[%s] FramesAcquired = %g, FramesLogged = %g, FramesAvailable = %g\n', ...
                 src.Tag, src.FramesAcquired, get(src.DiskLogger, 'FrameCount'), src.FramesAvailable);
         end
         
