@@ -114,7 +114,8 @@ classdef Connection < handle
                     obj.logUDP(timestamp, char(receivedData'));
                     
                     % start camera acquisition
-                    success = obj.cameraObj.startAcquisition(fullfile(localDataFolder, fileBase));
+                    success = obj.cameraObj.startAcquisition(fullfile(localDataFolder, fileBase), ...
+                        obj.camPars.CompressionRatio);
                     
                     if success
                         fwrite(obj.udpObj, receivedData); % echo after completing required actions

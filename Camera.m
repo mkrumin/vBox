@@ -13,6 +13,7 @@ classdef Camera < handle
         defaultFrameRate = 30;
         defaultFormat = 'Mono8_Mode1';
         defaultAdaptorName = 'mwspinnakerimaq';
+        defaultCR = 10;
     end
     
     methods
@@ -88,20 +89,27 @@ classdef Camera < handle
             closepreview(obj.vid)
         end
         
-        function allGood = startAcquisition(obj, fileBase)
+        function allGood = startAcquisition(obj, fileBase, CR)
             % define acquisition parameters
             allGood = false;
-            CR = 5; % compression ratio
+            if nargin < 3 || isempty(CR)
+                CR = obj.defaultCR;
+            end
             vw = VideoWriter(fileBase, 'Motion JPEG 2000');
             vw.FrameRate = obj.src.AcquisitionFrameRate;
-            vw.LosslessCompression = false;
-            vw.CompressionRatio = CR;
             vw.MJ2BitDepth = 8;
             vw2 = VideoWriter([fileBase, '_lastFrames'], 'Motion JPEG 2000');
             vw2.FrameRate = obj.src.AcquisitionFrameRate;
-            vw2.LosslessCompression = false;
-            vw2.CompressionRatio = CR;
             vw2.MJ2BitDepth = 8;
+            if CR == 0
+                vw.LosslessCompression = true;
+                vw2.LosslessCompression = true;
+            else
+                vw.LosslessCompression = false;
+                vw.CompressionRatio = CR;
+                vw2.LosslessCompression = false;
+                vw2.CompressionRatio = CR;
+            end
             obj.VW = vw2;
             obj.vid.LoggingMode = 'memory';
             obj.vid.DiskLogger = vw;
