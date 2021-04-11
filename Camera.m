@@ -68,11 +68,11 @@ classdef Camera < handle
             frInfo = propinfo(obj.src, 'AcquisitionFrameRate');
             frLimits = frInfo.ConstraintValue;
             if frameRate > frLimits(2)
-                fprintf('Desired frame rate of %g fps is too high, setting it to %g fps\n', ...
+                fprintf('Requested frame rate of %g fps is too high, setting it to %g fps\n', ...
                     frameRate, frLimits(2));
                 obj.src.AcquisitionFrameRate = frLimits(2);
             elseif frameRate < frLimits(1)
-                fprintf('Desired frame rate of %g fps is too low, setting it to %g fps\n', ...
+                fprintf('Requested frame rate of %g fps is too low, setting it to %g fps\n', ...
                     frameRate, frLimits(1));
                 obj.src.AcquisitionFrameRate = frLimits(1);
             else
@@ -83,6 +83,26 @@ classdef Camera < handle
             obj.src.ExposureTime = exposureInfo.ConstraintValue(2);
             warning('on', 'spinnaker:propertySet');
             fps = obj.src.AcquisitionFrameRate;
+        end
+        
+        function setExposure(obj, expDur)
+            if ~isempty(expDur)
+                expInfo = propinfo(obj.src, 'ExposureTime');
+                expLimits = expInfo.ConstraintValue;
+                warning('off', 'spinnaker:propertySet');
+                if expDur > expLimits(2)
+                    fprintf('Requested exposure of %g us is too long, setting it to %g us\n', ...
+                        expDur, expLimits(2));
+                    obj.src.ExposureTime = expLimits(2);
+                elseif expDur < expLimits(1)
+                    fprintf('Requested exposure of %g us is too short, setting it to %g us\n', ...
+                        expDur, expLimits(1));
+                    obj.src.ExposureTime = expLimits(1);
+                else
+                    obj.src.ExposureTime = expDur;
+                end
+                warning('on', 'spinnaker:propertySet');
+            end
         end
         
         function startPreview(obj, h)

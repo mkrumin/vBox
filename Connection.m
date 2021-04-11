@@ -61,6 +61,9 @@ classdef Connection < handle
             obj.cameraObj = Camera(obj.SerialNumber);
             obj.cameraObj.vid.Tag = obj.Name;
             fps = obj.cameraObj.setFrameRate(obj.camPars.FrameRate);
+            if ~isempty(obj.camPars.Exposure)
+                obj.cameraObj.setExposure(obj.camPars.Exposure);
+            end
             fprintf('''%s'' camera is now running at %5.3f fps\n', obj.Name, fps);
             
             startPreview(obj.cameraObj);

@@ -7,8 +7,8 @@ function list = camConfigList()
 %       pointgrey cameras. Might be of a different type of other cameras
 %   FrameRate : Desired framerate in fps. Default - 30 fps. 
 %       In reality might be slightly off, depending on camera.
-%   Exposure : Exposure in ms. Default will be the maximum possible for the
-%       current FrameRate.
+%   Exposure : Exposure in microseconds. Default will be the maximum 
+%       possible for the current FrameRate.
 %   LocalPort : Local port number for UDP communication with master (master
 %       should send communication to this port number). Default - 1001.
 %   CompressionRatio : Control the filesize vs. quality. Set to 0 for 
@@ -34,6 +34,7 @@ list(i).DeviceSerialNumber = '19462577';
 list(i).FrameRate = 60;
 list(i).LocalPort = 1001;
 list(i).CompressionRatio = 5;
+list(i).Exposure = [];
 
 i = i+1;
 list(i).Name = 'bodyCam';
