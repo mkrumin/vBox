@@ -117,6 +117,9 @@ classdef Connection < handle
                     obj.logUDP(timestamp, char(receivedData'));
                     
                     % start camera acquisition
+                    if ~obj.camPars.liveViewOn
+                        stopPreview(obj.cameraObj);
+                    end
                     success = obj.cameraObj.startAcquisition(fullfile(localDataFolder, fileBase), ...
                         obj.camPars.CompressionRatio);
                     
@@ -128,6 +131,10 @@ classdef Connection < handle
                     obj.udpLogFile = [];
                     % stop camera acquisition
                     obj.cameraObj.stopAcquisition();
+                    if ~obj.camPars.liveViewOn
+                        startPreview(obj.cameraObj);
+                    end
+
                     obj.ExpRef = '';
                     fwrite(obj.udpObj, receivedData); % echo after completing required actions
                 case 'alyx' % recieved Alyx instance

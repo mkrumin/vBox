@@ -34,7 +34,7 @@ list(i).DeviceSerialNumber = '19462577';
 list(i).FrameRate = 60;
 list(i).LocalPort = 1001;
 list(i).CompressionRatio = 5;
-list(i).Exposure = [];
+list(i).liveViewOn = true;
 
 i = i+1;
 list(i).Name = 'bodyCam';
