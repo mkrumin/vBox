@@ -7,10 +7,13 @@ classdef Connection < handle
         udpLogFile = [];
         ExpRef = '';
         cameraObj
+        camPars
     end
     
     properties(Access = private)
-        defaultLocalPort = 1001;
+        defaultVals = struct('FrameRate', 30, 'Exposure', [], ...
+            'LocalPort', 1001, 'liveViewOn', true, 'copyToServer', false, ...
+            'CompressionRatio', 10);
     end
     
     methods
@@ -33,28 +36,31 @@ classdef Connection < handle
                     camList(1).Name, camList(1).DeviceSerialNumber)
                 camIndex = 1;
             end
-            camParams = camList(camIndex);
-            obj.Name = camParams.Name;
-            obj.SerialNumber = camParams.DeviceSerialNumber;
+            obj.camPars = camList(camIndex);
+            % apply default values to non-existent fields 
+            f = fieldnames(obj.defaultVals);
+            for i = 1:length(f)
+                if ~isfield(obj.camPars, f{i}) || isempty(obj.camPars.(f{i}))
+                    obj.camPars.(f{i}) = obj.defaultVals.(f{i});
+                end
+            end
+            obj.Name = obj.camPars.Name;
+            obj.SerialNumber = obj.camPars.DeviceSerialNumber;
             
             fprintf('Setting up UDP communication..\n')
             [LocalIP, LocalHost] = myIP;
             
             obj.udpObj = udp('0.0.0.0', 1);
-            if isfield(camParams, 'LocalPort')
-                obj.udpObj.LocalPort = camParams.LocalPort;
-            else
-                obj.udpObj.LocalPort =  obj.defaultLocalPort;
-            end
+            obj.udpObj.LocalPort = obj.camPars.LocalPort;
             fprintf('Camera ''%s'' (SN: %s) will be listening on IP %s (aka ''%s''), port %d\n', ...
-                camParams.Name, camParams.DeviceSerialNumber, LocalIP, LocalHost, obj.udpObj.LocalPort);
+                obj.camPars.Name, obj.camPars.DeviceSerialNumber, LocalIP, LocalHost, obj.udpObj.LocalPort);
             obj.udpObj.DatagramReceivedFcn = @obj.udpCallback;
             fopen(obj.udpObj);
             
             fprintf('Setting up ''%s'' camera...\n', obj.Name)
             obj.cameraObj = Camera(obj.SerialNumber);
             obj.cameraObj.vid.Tag = obj.Name;
-            fps = obj.cameraObj.setFrameRate(camParams.FrameRate);
+            fps = obj.cameraObj.setFrameRate(obj.camPars.FrameRate);
             fprintf('''%s'' camera is now running at %5.3f fps\n', obj.Name, fps);
             
             startPreview(obj.cameraObj);
@@ -92,7 +98,7 @@ classdef Connection < handle
                         else
                             warning('There was a problem creating folder %s\n', localDataFolder)
                             warning('System message: %s\n', errMsg);
-                            return; % this will crash the master host on timeout, 
+                            return; % this will crash the master host on timeout,
                             % but will not disable DatagramReceivedFun of the udp
                         end
                     end
