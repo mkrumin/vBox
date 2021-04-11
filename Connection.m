@@ -134,7 +134,38 @@ classdef Connection < handle
                     if ~obj.camPars.liveViewOn
                         startPreview(obj.cameraObj);
                     end
+                    if obj.camPars.copyToServer
+                        localFolder = dat.expPath(obj.ExpRef, 'local', 'master');
+                        wildcard = sprintf('*%s*', obj.Name);
+%                         files = dir(fullfile(localFolder, wildcard));
+                        remoteFolder = dat.expPath(obj.ExpRef, 'main', 'master');
+                        success = 1;
+                        if ~exist(remoteFolder, 'dir')
+                            [success, errMsg] = mkdir(remoteFolder);
+                            if success
+                                fprintf('Folder %s successfully created\n', remoteFolder)
+                            else
+                                warning('There was a problem creating folder %s\n', remoteFolder)
+                                warning('System message: %s\n', errMsg);
+                                warning('You will need to copy files manually\n')
+                            end
+                        end
+                        if success
+                            fprintf('[%s] Copying files to server..', obj.Name);
+                            tic;
+                            [success, errMsg] = ...
+                                copyfile(fullfile(localFolder, wildcard), remoteFolder);
+                            if success
+                                fprintf('.done (%g seconds)\n', toc);
+                            else
+                                fprintf('.failed\n');
+                                printf('System message: %s', errMsg)
+                                warning('Check data integrity and copy files manually\n')
+                            end
+                        end
 
+                    end
+                    
                     obj.ExpRef = '';
                     fwrite(obj.udpObj, receivedData); % echo after completing required actions
                 case 'alyx' % recieved Alyx instance
