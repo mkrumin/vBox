@@ -18,7 +18,7 @@ classdef Connection < handle
     
     methods
         function obj = Connection(name)
-            camList = camConfigList;
+            camList = camConfig;
             if nargin > 0 && ~isempty(name)
                 camIndex = find(ismember({camList.Name}, name));
                 if isempty(camIndex)

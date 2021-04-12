@@ -1,4 +1,9 @@
-function list = camConfigList()
+function list = camConfig()
+
+% This is a sample function. Do not use it as is.
+% Create a copy in your path outside of this repository, rename it to
+% camConfig.m and edit according to the cameras you have and to the desired
+% acquisition parameters.
 
 % list = camConfigList() will create a list of camera configurations
 % list - structure array with the following fields
@@ -28,13 +33,13 @@ function list = camConfigList()
 %       for these cameras. Currently @Camera is the only class available.
 
 list = struct;
+
 i = 1;
 list(i).Name = 'bellyCam'; 
 list(i).DeviceSerialNumber = '19462577';
 list(i).FrameRate = 60;
 list(i).LocalPort = 1001;
 list(i).CompressionRatio = 5;
-
 
 i = i+1;
 list(i).Name = 'bodyCam';
