@@ -2,10 +2,10 @@ function list = camConfig()
 
 % This is a sample function. Do not use it as is.
 % Create a copy in your path outside of this repository, rename it to
-% camConfig.m and edit according to the cameras you have and to the desired
+% camConfig.m and edit according to the cameras you have and the desired
 % acquisition parameters.
 
-% list = camConfigList() will create a list of camera configurations
+% list = camConfig() will create a list of camera configurations
 % list - structure array with the following fields
 %   Name : camera nickname, a string that will be used for file naming
 %   DeviceSerialNumber : Unique ID of the camera. It is a string for FLIR
@@ -28,6 +28,8 @@ function list = camConfig()
 %       the end of each acquisition. Consider network speed. Camera will 
 %       only echo UDPs after copying is finished, on slow connectins (or 
 %       large files) the master host might time out waiting for the response.
+%   ExpEndWaitDur : duration of a pause in seconds after receiving an ExpEnd 
+%       UDP command and before stopping the acquisition. Default - 5 seconds.
 %   cameraClass : (Not implemented yet) - will be used to use cameras other
 %       than FLIR pointgrey cameras. Will require writing a separate class 
 %       for these cameras. Currently @Camera is the only class available.

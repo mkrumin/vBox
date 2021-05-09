@@ -13,7 +13,7 @@ classdef Connection < handle
     properties(Access = private)
         defaultVals = struct('FrameRate', 30, 'Exposure', [], ...
             'LocalPort', 1001, 'liveViewOn', true, 'copyToServer', false, ...
-            'CompressionRatio', 10);
+            'CompressionRatio', 10, 'ExpEndWaitDur', 5);
     end
     
     methods
@@ -129,6 +129,12 @@ classdef Connection < handle
                 case {'ExpEnd', 'ExpInterrupt'}
                     fclose(obj.udpLogFile);
                     obj.udpLogFile = [];
+                    if obj.camPars.ExpEndWaitDur > 0
+                        % wait before stopping the acquistion
+                        fprintf('[%s] Waiting for %g seconds before stopping ...\n', obj.Name, obj.camPars.ExpEndWaitDur);
+                        pause(obj.camPars.ExpEndWaitDur);
+                        fprintf('Stopping acquisition\n')
+                    end
                     % stop camera acquisition
                     obj.cameraObj.stopAcquisition();
                     if ~obj.camPars.liveViewOn
