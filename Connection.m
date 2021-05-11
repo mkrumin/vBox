@@ -133,7 +133,7 @@ classdef Connection < handle
                         % wait before stopping the acquistion
                         fprintf('[%s] Waiting for %g seconds before stopping ...\n', obj.Name, obj.camPars.ExpEndWaitDur);
                         pause(obj.camPars.ExpEndWaitDur);
-                        fprintf('Stopping acquisition\n')
+                        fprintf('[%s] Stopping acquisition\n', obj.Name)
                     end
                     % stop camera acquisition
                     obj.cameraObj.stopAcquisition();
@@ -173,6 +173,8 @@ classdef Connection < handle
                     end
                     
                     obj.ExpRef = '';
+                    fprintf('[%s] Ready for new acquisition\n', obj.Name)
+
                     fwrite(obj.udpObj, receivedData); % echo after completing required actions
                 case 'alyx' % recieved Alyx instance
                     fwrite(obj.udpObj, receivedData);

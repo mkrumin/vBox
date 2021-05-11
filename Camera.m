@@ -14,6 +14,8 @@ classdef Camera < handle
         defaultFormat = 'Mono8_Mode1';
         defaultAdaptorName = 'mwspinnakerimaq';
         defaultCR = 10;
+        memOnStart = []; % amount of memory this Matlab session was using at the beginning of current acquisition
+        ramOnStart = []; % amount of RAM available at the beginning of current acquisition
     end
     
     methods
@@ -149,7 +151,7 @@ classdef Camera < handle
             obj.vid.FramesAcquiredFcn = @obj.grabFrames;
             obj.vid.StopFcn = @obj.grabFrames;
             obj.vid.TimerFcn = @obj.printStats;
-            obj.vid.TimerPeriod = 10;
+            obj.vid.TimerPeriod = 30;
             
             [obj.hMeta, errorMsg] = fopen([fileBase, '_meta.bin'], 'w+');
             if (obj.hMeta == -1)
@@ -159,7 +161,7 @@ classdef Camera < handle
                 warning('Will not start acquisition (will cause TimeOut)')
                 return;
             end
-            obj.hTimes = fopen([fileBase, '_times.txt'], 'at+');
+            obj.hTimes = fopen([fileBase, '_times.txt'], 'wt+');
             if (obj.hTimes == -1)
                 warning('Failed to open %s file for logging timing metadata\n', ...
                     [fileBase, '_times.txt']);
@@ -177,6 +179,8 @@ classdef Camera < handle
             warning off
             start(obj.vid);
             warning on
+            % Immediately print stats to get inital memory values
+            obj.printStats;
             
             % TODO Make sure it is running? How?
             allGood = true;
@@ -185,7 +189,6 @@ classdef Camera < handle
         function stopAcquisition(obj)
             % stop acquisition
             stop(obj.vid);
-            
             if (obj.vid.FramesAvailable > 0)
                 % should never get here
                 tic;
@@ -216,6 +219,8 @@ classdef Camera < handle
             obj.vid.DiskLogger = [];
             delete(obj.VW);
             obj.VW = [];
+            obj.memOnStart = [];
+            obj.ramOnStart = [];
         end
         
         function grabFrames(obj, src, eventData)
@@ -244,8 +249,23 @@ classdef Camera < handle
         end
         
         function printStats(obj, src, eventData)
-            fprintf('[%s] FramesAcquired = %g, FramesLogged = %g, FramesAvailable = %g\n', ...
-                src.Tag, src.FramesAcquired, get(src.DiskLogger, 'FrameCount'), src.FramesAvailable);
+            try
+                fprintf('[%s] FramesAcquired = %g, FramesLogged = %g, FramesAvailable = %g\n', ...
+                    src.Tag, src.FramesAcquired, get(src.DiskLogger, 'FrameCount'), src.FramesAvailable);
+            catch
+                fprintf('[%s] FramesAcquired = %g, FramesLogged = %g, FramesAvailable = %g\n', ...
+                    obj.vid.Tag, obj.vid.FramesAcquired, get(obj.vid.DiskLogger, 'FrameCount'), obj.vid.FramesAvailable);
+            end
+            [usr, sys] = memory;
+            if isempty(obj.memOnStart)
+                % initialize persistent variables on the first run
+                obj.memOnStart = usr.MemUsedMATLAB;
+                obj.ramOnStart = sys.PhysicalMemory.Available;
+            end
+            fprintf('\tMemory: Matlab uses %4.2fGB (%3.1f%%), Available RAM %4.2fGB (%3.1f%%)\n',...
+                usr.MemUsedMATLAB/1024^3, usr.MemUsedMATLAB/obj.memOnStart*100, ...
+                sys.PhysicalMemory.Available/1024^3, ...
+                sys.PhysicalMemory.Available/obj.ramOnStart*100);
         end
         
         function processMetadata(obj)
