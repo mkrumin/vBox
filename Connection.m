@@ -60,13 +60,19 @@ classdef Connection < handle
             fprintf('Setting up ''%s'' camera...\n', obj.Name)
             obj.cameraObj = Camera(obj.SerialNumber);
             obj.cameraObj.vid.Tag = obj.Name;
-            fps = obj.cameraObj.setFrameRate(obj.camPars.FrameRate);
+            obj.cameraObj.setFrameRate(obj.camPars.FrameRate);
             if ~isempty(obj.camPars.Exposure)
                 obj.cameraObj.setExposure(obj.camPars.Exposure);
             end
+            startPreview(obj.cameraObj);
+
+            % adding camera name to the preview figure name
+            hFig = ancestor(obj.cameraObj.hPreview, 'Figure');
+            hFig.Name = sprintf('[%s] %s', obj.Name, hFig.Name);
+            
+            fps = obj.cameraObj.getFrameRate;
             fprintf('''%s'' camera is now running at %5.3f fps\n', obj.Name, fps);
             
-            startPreview(obj.cameraObj);
         end
         
         function udpCallback(obj, src, eventData)

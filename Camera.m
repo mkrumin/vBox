@@ -86,7 +86,11 @@ classdef Camera < handle
             warning('on', 'spinnaker:propertySet');
             fps = obj.src.AcquisitionFrameRate;
         end
-        
+
+        function fps = getFrameRate(obj)
+            fps = obj.src.AcquisitionFrameRate;
+        end
+
         function setExposure(obj, expDur)
             if ~isempty(expDur)
                 expInfo = propinfo(obj.src, 'ExposureTime');
