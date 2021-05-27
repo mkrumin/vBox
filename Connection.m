@@ -13,7 +13,7 @@ classdef Connection < handle
     properties(Access = private)
         defaultVals = struct('FrameRate', 30, 'Exposure', [], ...
             'LocalPort', 1001, 'liveViewOn', true, 'copyToServer', false, ...
-            'CompressionRatio', 10, 'ExpEndWaitDur', 5);
+            'CompressionRatio', 10, 'ExpEndWaitDur', 5, 'cameraClass', @Camera);
     end
     
     methods
@@ -58,7 +58,7 @@ classdef Connection < handle
             fopen(obj.udpObj);
             
             fprintf('Setting up ''%s'' camera...\n', obj.Name)
-            obj.cameraObj = Camera(obj.SerialNumber);
+            obj.cameraObj = obj.camPars.cameraClass(obj.SerialNumber);
             obj.cameraObj.vid.Tag = obj.Name;
             obj.cameraObj.setFrameRate(obj.camPars.FrameRate);
             if ~isempty(obj.camPars.Exposure)
