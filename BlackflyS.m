@@ -1,4 +1,4 @@
-classdef Camera < handle
+classdef BlackflyS < handle
     
     properties
         vid
@@ -11,15 +11,15 @@ classdef Camera < handle
     
     properties(Access = private)
         defaultFrameRate = 30;
-        defaultFormat = 'Mono8_Mode1';
-        defaultAdaptorName = 'mwspinnakerimaq';
+        defaultFormat = 'Mono8';
+        defaultAdaptorName = 'gentl';
         defaultCR = 10;
         memOnStart = []; % amount of memory this Matlab session was using at the beginning of current acquisition
         ramOnStart = []; % amount of RAM available at the beginning of current acquisition
     end
     
     methods
-        function obj = Camera(SerialNumber)
+        function obj = BlackflyS(SerialNumber)
             hw = imaqhwinfo(obj.defaultAdaptorName);
             nCams = length(hw.DeviceIDs);
             if nargin > 0
@@ -41,20 +41,29 @@ classdef Camera < handle
                 obj.src = getselectedsource(obj.vid);
             end
             warning('off', 'spinnaker:propertySet');
-            obj.src.AcquisitionFrameRateEnabled = 'True';
-            obj.src.AcquisitionFrameRateAuto = 'Off';
+            obj.src.AcquisitionFrameRateEnable = 'True';
+%             obj.src.AcquisitionFrameRateAuto = 'Off';
             obj.src.AcquisitionFrameRate = obj.defaultFrameRate;
             obj.src.ExposureAuto = 'Off';
             obj.src.ExposureMode = 'Timed';
             % setting max possible exposure
-            exposureInfo = propinfo(obj.src, 'ExposureTime');
-            obj.src.ExposureTime = exposureInfo.ConstraintValue(2);
+%             exposureInfo = propinfo(obj.src, 'ExposureTime');
+%             obj.src.ExposureTime = exposureInfo.ConstraintValue(2);
+            obj.src.ExposureTime = floor(0.99*1/obj.src.AcquisitionFrameRate*1e6);
             obj.src.BlackLevel = 0;
-            obj.src.SharpnessEnabled = 'True';
-            obj.src.SharpnessAuto = 'Off';
-            obj.src.Sharpness = 1024;
+%             obj.src.SharpeningEnable = 'False'; % Read-only
+%             obj.src.SharpeningAuto = 'False'; % Read-only
+            obj.src.Sharpening = 0; % negative - smoothing, positive - sharpening
             obj.src.GainAuto = 'Off';
             obj.src.Gain = 0;
+            obj.src.Gamma = 1;
+            
+%             obj.src.BinningVertical = 2;
+%             obj.src.BinningVerticalMode = 'Average'; % use this and not 'Sum', which will freeze the stream intermittently
+%             obj.src.BinningHorizontal = 2;
+%             obj.src.BinningHorizontalMode = 'Average';
+%             obj.src.BinningSelector = 'Sensor';
+            
             warning('on', 'spinnaker:propertySet');
             
             obj.vid.FramesPerTrigger = Inf;
@@ -80,9 +89,10 @@ classdef Camera < handle
             else
             obj.src.AcquisitionFrameRate = frameRate;
             end
-            exposureInfo = propinfo(obj.src, 'ExposureTime');
+%             exposureInfo = propinfo(obj.src, 'ExposureTime');
             % setting max possible exposure for the current frameRate
-            obj.src.ExposureTime = exposureInfo.ConstraintValue(2);
+%             obj.src.ExposureTime = exposureInfo.ConstraintValue(2);
+            obj.src.ExposureTime = floor(0.99*1/obj.src.AcquisitionFrameRate*1e6);
             warning('on', 'spinnaker:propertySet');
             fps = obj.src.AcquisitionFrameRate;
         end

@@ -1,4 +1,4 @@
-classdef Camera < handle
+classdef ImagingSource < handle
     
     properties
         vid
@@ -10,27 +10,28 @@ classdef Camera < handle
     end
     
     properties(Access = private)
-        defaultFrameRate = 30;
-        defaultFormat = 'Mono8_Mode1';
-        defaultAdaptorName = 'mwspinnakerimaq';
+        defaultFrameRate = '30.00';
+        defaultExposure = 0.0333;
+        defaultFormat = 'Y800 (640x480)';
+        defaultAdaptorName = 'tisimaq_r2013_64';
         defaultCR = 10;
         memOnStart = []; % amount of memory this Matlab session was using at the beginning of current acquisition
         ramOnStart = []; % amount of RAM available at the beginning of current acquisition
     end
     
     methods
-        function obj = Camera(SerialNumber)
+        function obj = ImagingSource(SerialNumber)
             hw = imaqhwinfo(obj.defaultAdaptorName);
             nCams = length(hw.DeviceIDs);
             if nargin > 0
                 for iCam = 1:nCams
                     obj.vid = videoinput(obj.defaultAdaptorName, hw.DeviceIDs{iCam}, obj.defaultFormat);
                     obj.src = getselectedsource(obj.vid);
-                    if isequal(obj.src.DeviceSerialNumber, SerialNumber)
+                    if isequal(obj.src.SerialNo, SerialNumber)
                         break; % correct camera found - break from the loop
                     end
                 end
-                if ~isequal(obj.src.DeviceSerialNumber, SerialNumber)
+                if ~isequal(obj.src.SerialNo, SerialNumber)
                     delete(obj);
                     warning('Requested camera with SN ''%s'' not found', SerialNumber);
                     warning('No camera was initialized')
@@ -40,74 +41,64 @@ classdef Camera < handle
                 obj.vid = videoinput(obj.defaultAdaptorName, hw.DeviceIDs{1}, obj.defaultFormat);
                 obj.src = getselectedsource(obj.vid);
             end
-            warning('off', 'spinnaker:propertySet');
-            obj.src.AcquisitionFrameRateEnabled = 'True';
-            obj.src.AcquisitionFrameRateAuto = 'Off';
-            obj.src.AcquisitionFrameRate = obj.defaultFrameRate;
+
+            obj.src.Brightness = 0;
             obj.src.ExposureAuto = 'Off';
-            obj.src.ExposureMode = 'Timed';
-            % setting max possible exposure
-            exposureInfo = propinfo(obj.src, 'ExposureTime');
-            obj.src.ExposureTime = exposureInfo.ConstraintValue(2);
-            obj.src.BlackLevel = 0;
-            obj.src.SharpnessEnabled = 'True';
-            obj.src.SharpnessAuto = 'Off';
-            obj.src.Sharpness = 1024;
-            obj.src.GainAuto = 'Off';
-            obj.src.Gain = 0;
-            warning('on', 'spinnaker:propertySet');
+            obj.src.Exposure = obj.defaultExposure;
+            obj.src.FrameRate = obj.defaultFrameRate;
+            obj.src.GainAuto = 'off';
+            obj.src.Gain = 1023;
+            obj.src.Gamma = 100;
+            obj.src.Strobe = 'Disable';
+            obj.src.Trigger = 'Disable';
             
             obj.vid.FramesPerTrigger = Inf;
             obj.vid.TriggerRepeat = 0;
+%             triggerconfig(obj.vid, 'immediate');
             
-            fprintf('%s (DeviceID %d) camera had been initialized\n', ...
-                obj.src.DeviceModelName, obj.vid.DeviceID);
+            fprintf('%s (SN %d) camera had been initialized\n', ...
+                'TheImagingSource', obj.src.SerialNo);
             
         end
         
         function fps = setFrameRate(obj, frameRate)
             warning('off', 'spinnaker:propertySet');
-            frInfo = propinfo(obj.src, 'AcquisitionFrameRate');
-            frLimits = frInfo.ConstraintValue;
-            if frameRate > frLimits(2)
-                fprintf('Requested frame rate of %g fps is too high, setting it to %g fps\n', ...
-                    frameRate, frLimits(2));
-                obj.src.AcquisitionFrameRate = frLimits(2);
-            elseif frameRate < frLimits(1)
-                fprintf('Requested frame rate of %g fps is too low, setting it to %g fps\n', ...
-                    frameRate, frLimits(1));
-                obj.src.AcquisitionFrameRate = frLimits(1);
-            else
-            obj.src.AcquisitionFrameRate = frameRate;
-            end
-            exposureInfo = propinfo(obj.src, 'ExposureTime');
+            frInfo = propinfo(obj.src, 'FrameRate');
+            frOptions = frInfo.ConstraintValue;
+            frNums = cellfun(@str2num, frOptions);
+            [~, ind] = min((frNums - frameRate).^2);
+            obj.src.FrameRate = frInfo.ConstraintValue{ind};
+
+            fps = str2double(obj.src.FrameRate);
             % setting max possible exposure for the current frameRate
-            obj.src.ExposureTime = exposureInfo.ConstraintValue(2);
-            warning('on', 'spinnaker:propertySet');
-            fps = obj.src.AcquisitionFrameRate;
+            obj.src.Exposure = floor(1/fps*1e4)/1e4;
         end
-
+        
         function fps = getFrameRate(obj)
-            fps = obj.src.AcquisitionFrameRate;
+            fps = str2double(obj.src.FrameRate);
         end
-
+        
         function setExposure(obj, expDur)
+            fps = str2double(obj.src.FrameRate);
+            % setting max possible exposure for the current frameRate
+            maxExposure = floor(1/fps*1e4)/1e4;
+
             if ~isempty(expDur)
-                expInfo = propinfo(obj.src, 'ExposureTime');
+                expInfo = propinfo(obj.src, 'Exposure');
                 expLimits = expInfo.ConstraintValue;
-                warning('off', 'spinnaker:propertySet');
-                if expDur > expLimits(2)
-                    fprintf('Requested exposure of %g us is too long, setting it to %g us\n', ...
-                        expDur, expLimits(2));
-                    obj.src.ExposureTime = expLimits(2);
+%                 warning('off', 'spinnaker:propertySet');
+                if expDur > min(maxExposure, expLimits(2)) 
+                    fprintf('Requested exposure of %g s is too long, setting it to %g s\n', ...
+                        expDur, min(maxExposure, expLimits(2)));
+                    obj.src.Exposure = min(maxExposure, expLimits(2));
                 elseif expDur < expLimits(1)
-                    fprintf('Requested exposure of %g us is too short, setting it to %g us\n', ...
+                    fprintf('Requested exposure of %g s is too short, setting it to %g s\n', ...
                         expDur, expLimits(1));
-                    obj.src.ExposureTime = expLimits(1);
+                    obj.src.Exposure = expLimits(1);
                 else
-                    obj.src.ExposureTime = expDur;
+                    obj.src.Exposure = expDur;
                 end
-                warning('on', 'spinnaker:propertySet');
+%                 warning('on', 'spinnaker:propertySet');
             end
         end
         
@@ -134,10 +125,10 @@ classdef Camera < handle
                 CR = obj.defaultCR;
             end
             vw = VideoWriter(fileBase, 'Motion JPEG 2000');
-            vw.FrameRate = obj.src.AcquisitionFrameRate;
+            vw.FrameRate = str2double(obj.src.FrameRate);
             vw.MJ2BitDepth = 8;
             vw2 = VideoWriter([fileBase, '_lastFrames'], 'Motion JPEG 2000');
-            vw2.FrameRate = obj.src.AcquisitionFrameRate;
+            vw2.FrameRate = str2double(obj.src.FrameRate);
             vw2.MJ2BitDepth = 8;
             if CR == 0
                 vw.LosslessCompression = true;
@@ -175,7 +166,7 @@ classdef Camera < handle
             end
             fprintf(obj.hTimes, ...
                 'AbsTime\t\t\t\tFrameNumber\tRelativeFrame\tTriggerIndex\tTime\r\n');
-
+            
             % actually start acquisition
             open(obj.vid.DiskLogger);
             fprintf('Starting acquisition...\n');
