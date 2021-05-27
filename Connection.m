@@ -13,7 +13,7 @@ classdef Connection < handle
     properties(Access = private)
         defaultVals = struct('FrameRate', 30, 'Exposure', [], ...
             'LocalPort', 1001, 'liveViewOn', true, 'copyToServer', false, ...
-            'CompressionRatio', 10, 'ExpEndWaitDur', 5);
+            'CompressionRatio', 10, 'ExpEndWaitDur', 5, 'cameraClass', @Camera);
     end
     
     methods

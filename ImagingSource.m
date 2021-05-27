@@ -10,35 +10,54 @@ classdef ImagingSource < handle
     end
     
     properties(Access = private)
-        defaultFrameRate = '30.0000';
-        defaultExposure = -5;
-        defaultFormat = 'Y800_640x480';
-        defaultAdaptorName = 'winvideo';
+        defaultFrameRate = '30.00';
+        defaultExposure = 0.0333;
+        defaultFormat = 'Y800 (640x480)';
+        defaultAdaptorName = 'tisimaq_r2013_64';
         defaultCR = 10;
         memOnStart = []; % amount of memory this Matlab session was using at the beginning of current acquisition
         ramOnStart = []; % amount of RAM available at the beginning of current acquisition
     end
     
     methods
-        function obj = ImagingSource(DeviceID)
-            obj.vid = videoinput(obj.defaultAdaptorName, DeviceID, obj.defaultFormat);
-            obj.src = getselectedsource(obj.vid);
-%             obj.src.Strobe = 'Disable';
-%             obj.src.Trigger = 'Disable';
-            obj.src.ExposureMode = 'manual';
+        function obj = ImagingSource(SerialNumber)
+            hw = imaqhwinfo(obj.defaultAdaptorName);
+            nCams = length(hw.DeviceIDs);
+            if nargin > 0
+                for iCam = 1:nCams
+                    obj.vid = videoinput(obj.defaultAdaptorName, hw.DeviceIDs{iCam}, obj.defaultFormat);
+                    obj.src = getselectedsource(obj.vid);
+                    if isequal(obj.src.SerialNo, SerialNumber)
+                        break; % correct camera found - break from the loop
+                    end
+                end
+                if ~isequal(obj.src.SerialNo, SerialNumber)
+                    delete(obj);
+                    warning('Requested camera with SN ''%s'' not found', SerialNumber);
+                    warning('No camera was initialized')
+                    return;
+                end
+            else
+                obj.vid = videoinput(obj.defaultAdaptorName, hw.DeviceIDs{1}, obj.defaultFormat);
+                obj.src = getselectedsource(obj.vid);
+            end
+
+            obj.src.Brightness = 0;
+            obj.src.ExposureAuto = 'Off';
             obj.src.Exposure = obj.defaultExposure;
             obj.src.FrameRate = obj.defaultFrameRate;
-            obj.src.GainMode = 'manual';
+            obj.src.GainAuto = 'off';
             obj.src.Gain = 1023;
             obj.src.Gamma = 100;
+            obj.src.Strobe = 'Disable';
+            obj.src.Trigger = 'Disable';
             
-            obj.vid.ReturnedColorspace = 'grayscale';
             obj.vid.FramesPerTrigger = Inf;
             obj.vid.TriggerRepeat = 0;
-            triggerconfig(obj.vid, 'immediate');
+%             triggerconfig(obj.vid, 'immediate');
             
-            fprintf('%s (DeviceID %d) camera had been initialized\n', ...
-                'TheImagingSource', obj.vid.DeviceID);
+            fprintf('%s (SN %d) camera had been initialized\n', ...
+                'TheImagingSource', obj.src.SerialNo);
             
         end
         
@@ -52,7 +71,7 @@ classdef ImagingSource < handle
 
             fps = str2double(obj.src.FrameRate);
             % setting max possible exposure for the current frameRate
-            obj.src.Exposure = round(log2(1/fps));
+            obj.src.Exposure = floor(1/fps*1e4)/1e4;
         end
         
         function fps = getFrameRate(obj)
@@ -62,18 +81,18 @@ classdef ImagingSource < handle
         function setExposure(obj, expDur)
             fps = str2double(obj.src.FrameRate);
             % setting max possible exposure for the current frameRate
-            maxExposure = round(log2(1/fps));
+            maxExposure = floor(1/fps*1e4)/1e4;
 
             if ~isempty(expDur)
                 expInfo = propinfo(obj.src, 'Exposure');
                 expLimits = expInfo.ConstraintValue;
 %                 warning('off', 'spinnaker:propertySet');
                 if expDur > min(maxExposure, expLimits(2)) 
-                    fprintf('Requested exposure of 2^(%g) s is too long, setting it to 2^(%g) s\n', ...
+                    fprintf('Requested exposure of %g s is too long, setting it to %g s\n', ...
                         expDur, min(maxExposure, expLimits(2)));
                     obj.src.Exposure = min(maxExposure, expLimits(2));
                 elseif expDur < expLimits(1)
-                    fprintf('Requested exposure of 2^(%g) s is too short, setting it to 2^(%g) s\n', ...
+                    fprintf('Requested exposure of %g s is too short, setting it to %g s\n', ...
                         expDur, expLimits(1));
                     obj.src.Exposure = expLimits(1);
                 else
