@@ -132,6 +132,7 @@ classdef Connection < handle
                     if success
                         fwrite(obj.udpObj, receivedData); % echo after completing required actions
                     end % otherwise mc/mpep will TimeOut
+ 
                 case {'ExpEnd', 'ExpInterrupt'}
                     fclose(obj.udpLogFile);
                     obj.udpLogFile = [];
