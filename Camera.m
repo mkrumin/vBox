@@ -246,7 +246,7 @@ classdef Camera < handle
             % This is in computer time - less precise
             for iFrame = 1:nFrames
                 s = meta(iFrame);
-                fprintf(obj.hTimes, '[%d,%d,%d,%d,%d,%.5f]\t%d\t\t%d\t\t%d\t\t%.5f\r\n', ...
+                fprintf(obj.hTimes, '[%d,%d,%d,%d,%d,%.5f]\t%d\t\t%d\t\t%d\t\t%.5f\r', ...
                     s.AbsTime, s.FrameNumber, s.RelativeFrame, s.TriggerIndex, t(iFrame));
             end
             

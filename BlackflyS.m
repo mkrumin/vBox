@@ -184,7 +184,7 @@ classdef BlackflyS < handle
                 return;
             end
             fprintf(obj.hTimes, ...
-                'AbsTime\t\t\t\tFrameNumber\tRelativeFrame\tTriggerIndex\tTime\r\n');
+                'AbsTime\t\t\t\tFrameNumber\tRelativeFrame\tTriggerIndex\tTime\r');
 
             % actually start acquisition
             open(obj.vid.DiskLogger);
