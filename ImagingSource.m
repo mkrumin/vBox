@@ -148,14 +148,6 @@ classdef ImagingSource < handle
             obj.vid.TimerFcn = @obj.printStats;
             obj.vid.TimerPeriod = 30;
             
-            [obj.hMeta, errorMsg] = fopen([fileBase, '_meta.bin'], 'w+');
-            if (obj.hMeta == -1)
-                warning('Failed to open %s file for writing embedded metadata\n', ...
-                    [fileBase, '_meta.bin']);
-                warning('System message: %s\n', errorMsg);
-                warning('Will not start acquisition (will cause TimeOut)')
-                return;
-            end
             obj.hTimes = fopen([fileBase, '_times.txt'], 'wt+');
             if (obj.hTimes == -1)
                 warning('Failed to open %s file for logging timing metadata\n', ...
@@ -209,7 +201,6 @@ classdef ImagingSource < handle
             
             % clean up
             fclose(obj.hTimes);
-            fclose(obj.hMeta);
             delete(obj.vid.DiskLogger);
             obj.vid.DiskLogger = [];
             delete(obj.VW);
@@ -229,10 +220,7 @@ classdef ImagingSource < handle
                 writeVideo(obj.VW, data)
                 close(obj.VW);
             end
-            % Writing metadata embedded in the frame (camera times - precise)
-            % First 4 bytes is timestamp, next 4 bytes - frameCounter
-            embeddedData = squeeze(data(1, 1:8, 1, :));
-            fwrite(obj.hMeta, embeddedData, 'uint8');
+
             % Logging the timing metadata, as received from getdata();
             % This is in computer time - less precise
             for iFrame = 1:nFrames
@@ -264,34 +252,10 @@ classdef ImagingSource < handle
         end
         
         function processMetadata(obj)
-            % extract and process metadata embedded in the frames
-            frewind(obj.hMeta);
-            embeddedData = fread(obj.hMeta, '*uint8');
-            embeddedData = reshape(embeddedData, 8, [])';
-            frameCounter = embeddedData(:, 5:8);
-            frameCounter = bsxfun(@times, int64(frameCounter), int64(256.^[3 2 1 0]));
-            frameCounter = sum(frameCounter, 2);
-            dFrames = diff(frameCounter);
-            dFrames(dFrames<0) = dFrames(dFrames<0) + 2^32;
-            frameCounter = [1; cumsum(dFrames)+1];
-            timeData = int16(embeddedData(:, 1:4));
-            seconds = int8(floor(timeData(:,1))/2);
-            cycles = mod(timeData(:, 1), 2) * 2^12 + timeData(:, 2) * 2^4 + floor(timeData(:,3)/2^4);
             
-            dSeconds = int16(diff(seconds));
-            dSeconds(dSeconds<0) = dSeconds(dSeconds<0) + 128;
-            
-            dCycles = diff(cycles);
-            dCycles(dCycles<0) = dCycles(dCycles<0) + 8000;
-            dCycles(dSeconds==1) = dCycles(dSeconds==1) - 8000;
-            
-            timeStamp = [0; double(cumsum(dSeconds)) + double(cumsum(dCycles))/8000];
-            
-            embeddedData  = struct('frameCounter', frameCounter, 'timeStamp', timeStamp);
-            
-            % extract the software timing information
+            % extract the software timing information from txt log files
             % expected number of Frames
-            nFrames = length(embeddedData.frameCounter);
+            nFrames = obj.vid.FramesAcquired;
             absTime = nan(nFrames, 1);
             frameNumber = nan(nFrames, 1);
             frameTime = nan(nFrames, 1);
@@ -317,7 +281,7 @@ classdef ImagingSource < handle
             [~, fn, ~] = fileparts(get(obj.vid.DiskLogger, 'FileName'));
             fp = get(obj.vid.DiskLogger, 'Path');
             
-            save(fullfile(fp, [fn, '_frameTimes']), 'embeddedData', 'softData');
+            save(fullfile(fp, [fn, '_frameTimes']), 'softData');
             
         end
         
